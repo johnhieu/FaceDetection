@@ -1,9 +1,10 @@
+
 #include "opencv2/objdetect.hpp"
 #include "opencv2/videoio.hpp"
 #include "opencv2/highgui.hpp"
 #include "opencv2/imgproc.hpp"
 #include "opencv2/features2d.hpp"
-
+#include "opencv2/opencv.hpp"
 #include <iostream>
 #include <stdio.h>
 
@@ -24,7 +25,7 @@ String window_name = "Capture - Face detection";
 /** @function main */
 int main(int argc, const char** argv)
 {
-	CommandLineParser parser(argc, argv,
+ 	CommandLineParser parser(argc, argv,
 		"{help h||}"
 		"{face_cascade|../../data/haarcascades/haarcascade_frontalface_alt.xml|}"
 		"{eyes_cascade|../../data/haarcascades/haarcascade_eye_tree_eyeglasses.xml|}"
@@ -79,11 +80,11 @@ void detectAndDisplay(Mat frame)
 	equalizeHist(frame_gray, frame_gray);
 
 	//-- Detect faces
-	face_cascade.detectMultiScale(frame_gray, faces, 1.2, 2, 0 | CASCADE_SCALE_IMAGE, Size(20,20));
+	face_cascade.detectMultiScale(frame_gray, faces, 1.2, 5, 0 | CASCADE_SCALE_IMAGE, Size(20,20));
 
 	for (size_t i = 0; i < faces.size(); i++)
 	{
-		//
+		
 		Rect face = faces[i];
 	
 		Point center(faces[i].x + faces[i].width / 2, faces[i].y + faces[i].height / 2);
@@ -92,75 +93,55 @@ void detectAndDisplay(Mat frame)
 		
 		Mat faceROI = frame_gray(faces[i]);
 		std::vector<Rect> eyes;
-		
-		/*-- In each face, detect eyes
-		eyes_cascade.detectMultiScale(faceROI, eyes, 1.05, 3, 0 | CASCADE_SCALE_IMAGE, Size(30, 30));
-
-		for (size_t j = 0; j < eyes.size(); j++)
-		{
-			Point eye_center(faces[i].x + eyes[j].x + eyes[j].width / 2, faces[i].y + eyes[j].y + eyes[j].height / 2);
-			int radius = cvRound((eyes[j].width + eyes[j].height)*0.25);
-			circle(frame, eye_center, radius, Scalar(255, 0, 0), 4, 8, 0);
-		}
-		*/
-
-
+	
 		//-- Detect left eye each face
-		eyes_cascade.detectMultiScale(faceROI, eyes, 1.2, 10, 0 |CASCADE_SCALE_IMAGE, Size(20,20), Size(100,100));
+		eyes_cascade.detectMultiScale(faceROI, eyes, 1.1, 10, 0 |CASCADE_SCALE_IMAGE, Size(30,30), Size(100,100));
 		for (size_t j = 0; j < eyes.size(); j++)
 		{
 
 			Rect eye = eyes[j];
 			eye.x += faces[i].x;
-			eye.y += faces[i].y;
+			eye.height /= 2;
+			eye.y += faces[i].y + (eye.height / 2); 
+			
 			/*
 			eye.y += eye.height / 4;
 			eye.height /= 2;
 			*/
 			rectangle(frame, eye, Scalar(255, 0, 0), 4, 8, 0);
-			
+
+		
 			Mat eyesROI = frame_gray(eye);
-			
 			/*
 			Canny(eyesROI, eyesROI, 50, 150 , 3);
 			eyesROI.convertTo(eyesROI, CV_8U);
 			*/
-			threshold(eyesROI, eyesROI, 20, 255, 0);
-			threshold(eyesROI, eyesROI, 70, 255, 2);
-			
-			Canny(eyesROI, eyesROI, 20, 30, 3);
-			//GaussianBlur(eyesROI, eyesROI, Size(9, 9), 4, 4);
+			GaussianBlur(eyesROI, eyesROI, Size(9, 9), 3, 3);
+			threshold(eyesROI, eyesROI, 25, 255, 0);
+			threshold(eyesROI, eyesROI, 50, 255, 2);
+
+			Canny(eyesROI, eyesROI, 30, 90, 3);
+
 			std::vector<Vec3f> circles;
-			
+
 			if (j == 0)
 			{
 				imshow("Eyes", eyesROI);
 				namedWindow("Eyes", WINDOW_NORMAL);
 			}
-			
-			HoughCircles(eyesROI, circles, CV_HOUGH_GRADIENT, 10, 16, 150, 80,3,15);
-			/*
-			Mat canny_output;
-			vector<vector<Point>> contours;
-			vector<Vec4i> hierachy;
-			Canny(eyesROI, canny_output, 100, 200, 3);
-			findContours(canny_output, contours, hierachy, RETR_TREE, CHAIN_APPROX_SIMPLE, Point(0, 0));
-			Mat drawing = Mat::zeros(canny_output.size(), CV_8UC3);
 
-			for (size_t k = 0; k < contours.size(); k++)
-			{
-				drawContours(drawing, contours, (int)k, Scalar(0, 0, 255), 2, 8, hierachy, 0, Point());
-			}
-			imshow("Eyes", drawing);
-			namedWindow("Eyes", WINDOW_AUTOSIZE);
-			*/
+			HoughCircles(eyesROI, circles, CV_HOUGH_GRADIENT, 8, 16, 150, 50, 3, 15);
+		
+
 			for (size_t k = 0; k < circles.size(); k++)
 			{ 
-				Point center(cvRound(circles[k][0] + faces[i].x + eyes[j].x), cvRound(circles[k][1] + faces[i].y + eyes[j].y ));
+				Point center(cvRound(circles[k][0] + eye.x), cvRound(circles[k][1] + eye.y ));
 				int radius = cvRound(circles[k][2]);
 				circle(frame, center, 3, Scalar(0, 255, 0), -1, 8, 0);
 				circle(frame, center, radius, Scalar(0, 0, 255), 2, 8, 0);
 			}
+			
+
 			
 		}
 		
